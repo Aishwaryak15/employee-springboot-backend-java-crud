@@ -96,14 +96,6 @@ jobs:
         workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
         service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-    - name: Set GCP Project
-      run: gcloud config set project ${{ env.PROJECT_ID }}
-
-    - name: Verify GCP Authentication
-      run: |
-        gcloud config list
-        gcloud auth list
-
     - name: Authenticate Docker to Artifact Registry
       run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
