@@ -11,7 +11,7 @@ env:
   PROJECT_ID: 'cloudkmsgithubactions' # update to your Google Cloud project ID
   REGION: 'us-central1' # update to your region
   REPOSITORY: 'cloudrun-java'
-  SERVICE: 'service-cloudrun'
+  SERVICE: 'my-cloudrun-service'
   
 
 # Add "id-token" with the intended permissions.
@@ -139,10 +139,10 @@ jobs:
           --format json \
           --update-env-vars SERVICE_NAME="BE Service" \
           --platform=managed \
-          --service-account raj-service-account@poc-project-140697.iam.gserviceaccount.com \
+          --service-account github-sa-cloudrunpoc@cloudkmsgithubactions.iam.gserviceaccount.com \
           --allow-unauthenticated \
           --no-use-http2 \
-          --port 9000 \
+          --port 8080 \
           --timeout 300s
           
           
