@@ -8,7 +8,7 @@ on:
       - main
        
 env:
-  PROJECT_ID: 'poc-project-140697' # update to your Google Cloud project ID
+  PROJECT_ID: 'cloudkmsgithubactions' # update to your Google Cloud project ID
   REGION: 'us-central1' # update to your region
   REPOSITORY: 'cloudrun-java'
   SERVICE: 'service-cloudrun'
@@ -96,11 +96,13 @@ jobs:
         workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
         service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-    - name: Verify GCP Authentication (DEBUGGING)
-      run: gcloud auth list
+    - name: Set GCP Project
+      run: gcloud config set project ${{ env.PROJECT_ID }}
 
     - name: Verify GCP Authentication
-      run: gcloud auth list
+      run: |
+        gcloud config list
+        gcloud auth list
 
     - name: Authenticate Docker to Artifact Registry
       run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
