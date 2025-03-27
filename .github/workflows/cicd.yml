@@ -1,61 +1,34 @@
-# This workflow build and push a Docker container to Google Artifact Registry
-# and deploy it on Cloud Run when a commit is pushed to the "main"
-# branch.
-#
-# To configure this workflow:
-#
-# 1. Enable the following Google Cloud APIs:
-#
-#    - Artifact Registry (artifactregistry.googleapis.com)
-#    - Cloud Run (run.googleapis.com)
-#    - IAM Credentials API (iamcredentials.googleapis.com)
-#
-#    You can learn more about enabling APIs at
-#    https://support.google.com/googleapi/answer/6158841.
-#
-# 2. Create and configure a Workload Identity Provider for GitHub:
-#    https://github.com/google-github-actions/auth#preferred-direct-workload-identity-federation.
-#
-#    Depending on how you authenticate, you will need to grant an IAM principal
-#    permissions on Google Cloud:
-#
-#    - Artifact Registry Administrator (roles/artifactregistry.admin)
-#    - Cloud Run Developer (roles/run.developer)
-#
-#    You can learn more about setting IAM permissions at
-#    https://cloud.google.com/iam/docs/manage-access-other-resources
-#
-# 3. Change the values in the "env" block to match your values.
-
-name: 'Build and Deploy to Cloud Run'
-
+ # Define the CI/CD Workflow for Java code 
+name: CI-CD Workflow for java code   
+ 
+# Trigger the workflow on pushes to the specified branch 
 on:
   push:
     branches:
       - main
-
+       
 env:
-  PROJECT_ID: 'cloudrun-project-poc' # TODO: update to your Google Cloud project ID
-  REGION: 'us-central1' # TODO: update to your region
-  REPOSITORY: 'be-img-cr'
-  SERVICE: 'java-service-cloudrun' # TODO: update to your service name
-  #WORKLOAD_IDENTITY_PROVIDER: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider' # TODO: update to your workload identity provider
+  PROJECT_ID: 'poc-project-140697' # update to your Google Cloud project ID
+  REGION: 'us-central1' # update to your region
+  REPOSITORY: 'cloudrun-java'
+  SERVICE: 'service-cloudrun'
+  
 
+# Add "id-token" with the intended permissions.
+permissions:
+    contents: 'read'
+    id-token: 'write'
+      
 jobs:
-  ci:
-    runs-on: ubuntu-latest   
-    permissions:
-        contents: 'read'
-        id-token: 'write'
+  # CI job
+  build:
+    runs-on: ubuntu-latest
+
     # Define the steps to be executed in the job
     steps:
-    - name: Set short git commit SHA
-      id: commit
-      uses: prompt/actions-commit-hash@v2
-    
-    # check out repository's code into workflow's workspace
+    # Checkout the repository to access source code
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
     # Set up JDK 17
     - name: Set up JDK 17
@@ -64,6 +37,14 @@ jobs:
        distribution: 'temurin'
        java-version: '17'
 
+    # - name: Authenticate to Google Cloud using OIDC
+    #   id: auth1
+    #   uses: google-github-actions/auth@v2
+    #   with:
+    #     token_format: 'access_token'
+    #     workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+    #     service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}   
+
     # Run unit tests using maven goal
     - name: Run unit test
       run: mvn test
@@ -71,75 +52,111 @@ jobs:
     # Generate code-coverage report using jacoco
     - name : Get code-coverage report
       run : mvn jacoco:report
-      
-    # Upload code-coverage report as an artifact   
+
+    # Upload code-coverage report as an artifact
     - name: Code Coverage Report
       uses: actions/upload-artifact@v4
       with:
-       name: jacoco-report
-       path: target/site/jacoco/index.html
+        name: Code Coverage Reports
+        path: target/site/jacoco/index.html   # Code coverage report will be generate at 'target/site/jacoco/index.html'
 
     # - name: SonarQube Scan
     #   uses: sonarsource/sonarqube-scan-action@v2
     #   with:
     #       projectBaseDir: .
     #       args: >
-    #         -Dsonar.projectKey=sonarqube-gitaction_gitaction-poc-10-java-ci
+    #         -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
     #         -Dsonar.sources=.
-    #         -Dsonar.host.url=http://34.45.30.132:9000
+    #         -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
     #         -Dsonar.java.binaries=./target/classes
     #         -Dsonar.login=${{ secrets.SONAR_TOKEN }}
     #   env:
     #       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     #       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          
+    #  #Check sonarqube quality gate using script to make a GET request to the SonarQube API endpoint and retrieve the status of the quality gate
+    # - name: Check SonarQube Quality Gate
+    #   run: |
+    #     status=$(curl -s "${{ secrets.SONAR_HOST_URL }}/api/qualitygates/project_status?projectKey=${{ secrets.SONAR_PROJECT_KEY }}" -u "${{ secrets.SONAR_TOKEN }}": | jq -r '.projectStatus.status')
+    #     if [[ "$status" != "OK" ]]; then
+    #        echo "SonarQube quality gate check failed." 
+    #     else
+    #        echo "SonarQube quality gate check succeeded. Continuing with the workflow..."
+    #     fi
 
-  # Once we build the package using maven as build tool the artifact generated is in jar format and store under target directory
+    # Once we build the package using maven as build tool the artifact generated is in jar format and store under target directory
     - name: Build project and package jar
-      run: mvn package -Dmaven.test.skip
+      run: mvn package
 
-    - name: Google Auth
+    - name: Authenticate to Google Cloud using OIDC
       id: auth
-      uses: 'google-github-actions/auth@v2'
+      uses: google-github-actions/auth@v2
       with:
-          token_format: 'access_token'
-          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-          service_account:  ${{ secrets.WIF_SERVICE_ACCOUNT }}
+        token_format: 'access_token'
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
     - name: Authenticate Docker to Artifact Registry
       run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
+    - name: List Workspace Contents (DEBUGGING)
+      run: ls -l /home/runner/work/cloudrun-raj/cloudrun-raj/  
+
     - name: Build and Push Container to Artifact Registry
       run: |
+        mvn clean install
         DOCKER_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ github.sha }}"
         docker build -t $DOCKER_IMAGE .
         docker push $DOCKER_IMAGE
 
-  # cd:
-  #   needs: ci
-  #   runs-on: 'ubuntu-latest'
-  #   steps:
-    # Authenticate Docker to Google Cloud Artifact Registry
+
+    # Push to Artifact Registry if scan is successful
+    - name: Push Docker Image to Artifact Registry
+      if: success()
+      run: |
+        DOCKER_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ github.sha }}"
+        docker push $DOCKER_IMAGE
+
+  cd:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Authenticate to Google Cloud using OIDC
+      id: auth
+      uses: google-github-actions/auth@v2
+      with:
+        token_format: 'access_token'
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+    
+    - name: Deploy to Cloud Run
+      run: |
+        gcloud run deploy ${{ env.SERVICE }} \
+          --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ github.sha }} \
+          --quiet \
+          --region=${{ env.REGION }} \
+          --project ${{ env.PROJECT_ID }} \
+          --format json \
+          --update-env-vars SERVICE_NAME="BE Service" \
+          --platform=managed \
+          --service-account raj-service-account@poc-project-140697.iam.gserviceaccount.com \
+          --allow-unauthenticated \
+          --no-use-http2 \
+          --port 9000 \
+          --timeout 300s
+          
+          
+
+ 
 
 
-    # - name: Deploy to Cloud Run
-    #   id: deploy
-    #   run: |-
-    #       gcloud run deploy ${{ env.SERVICE }} \
-    #         --image ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }} \
-    #         --quiet \
-    #         --platform managed \
-    #         --region ${{ env.REGION }} \
-    #         --project ${{ env.PROJECT_ID }} \
-    #         --format json \
-    #         --update-env-vars SERVICE_NAME="Card Service" \
-    #         --update-secrets DB_DATABASE=DB_DATABASE:latest \
-    #         --update-secrets DB_USERNAME=DB_USERNAME:2 \
-    #         --update-secrets DB_PASSWORD=DB_PASSWORD:2 \
-    #         --update-secrets DB_CLOUD_SQL_INSTANCE=DB_CLOUD_SQL_INSTANCE:1 \
-    #         --service-account card-service-cloudrun@noted-ensign-357703.iam.gserviceaccount.com \
-    #         --allow-unauthenticated
 
-      # If required, use the Cloud Run url output in later steps
-    # - name: Show Output
-    #   run: echo ${{ steps.deploy.outputs.url }}
-       
+
+  
+     
+            
+            
+
+  
+
+   
