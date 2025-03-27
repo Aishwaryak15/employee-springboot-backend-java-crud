@@ -100,7 +100,7 @@ jobs:
       run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
     - name: List Workspace Contents (DEBUGGING)
-      run: ls -l /home/runner/work/cloudrun-raj/cloudrun-raj/  
+      run: ls -l /home/runner/work/cloudrun-raj/cloudrun-ash/  
 
     - name: Build and Push Container to Artifact Registry
       run: |
