@@ -8,10 +8,10 @@ on:
       - main
        
 env:
-  PROJECT_ID: 'cloudkmsgithubactions' # update to your Google Cloud project ID
+  PROJECT_ID: 'sonic-fiber-460609-q4' # update to your Google Cloud project ID
   REGION: 'us-central1' # update to your region
-  REPOSITORY: 'cloudrun-java'
-  SERVICE: 'my-cloudrun-service'
+  REPOSITORY: 'gke-runner-repo'
+  # SERVICE: 'my-cloudrun-service'
   
 
 # Add "id-token" with the intended permissions.
@@ -22,7 +22,7 @@ permissions:
 jobs:
   # CI job
   build:
-    runs-on: ubuntu-latest
+    runs-on: my-runner-9b7j5-85kcp
 
     # Define the steps to be executed in the job
     steps:
@@ -117,33 +117,33 @@ jobs:
         DOCKER_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ github.sha }}"
         docker push $DOCKER_IMAGE
 
-  cd:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - name: Authenticate to Google Cloud using OIDC
-      id: auth
-      uses: google-github-actions/auth@v2
-      with:
-        token_format: 'access_token'
-        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+  # cd:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Authenticate to Google Cloud using OIDC
+  #     id: auth
+  #     uses: google-github-actions/auth@v2
+  #     with:
+  #       token_format: 'access_token'
+  #       workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+  #       service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
     
-    - name: Deploy to Cloud Run
-      run: |
-        gcloud run deploy ${{ env.SERVICE }} \
-          --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ github.sha }} \
-          --quiet \
-          --region=${{ env.REGION }} \
-          --project ${{ env.PROJECT_ID }} \
-          --format json \
-          --update-env-vars SERVICE_NAME="BE Service" \
-          --platform=managed \
-          --service-account github-sa-cloudrunpoc@cloudkmsgithubactions.iam.gserviceaccount.com \
-          --allow-unauthenticated \
-          --no-use-http2 \
-          --port 9000 \
-          --timeout 600s
+  #   - name: Deploy to Cloud Run
+  #     run: |
+  #       gcloud run deploy ${{ env.SERVICE }} \
+  #         --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ github.sha }} \
+  #         --quiet \
+  #         --region=${{ env.REGION }} \
+  #         --project ${{ env.PROJECT_ID }} \
+  #         --format json \
+  #         --update-env-vars SERVICE_NAME="BE Service" \
+  #         --platform=managed \
+  #         --service-account github-sa-cloudrunpoc@cloudkmsgithubactions.iam.gserviceaccount.com \
+  #         --allow-unauthenticated \
+  #         --no-use-http2 \
+  #         --port 9000 \
+  #         --timeout 600s
           
           
 
