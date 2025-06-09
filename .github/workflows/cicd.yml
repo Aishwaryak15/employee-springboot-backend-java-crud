@@ -23,7 +23,7 @@ jobs:
   build:
     # IMPORTANT: Use the correct runs-on label for your runner scale set.
     # Based on your Helm installation, it should be 'github-runner-scale-set'.
-    runs-on: github-runner-scale-set
+    runs-on: self-hosted
 
     # Define the steps to be executed in the job
     steps:
