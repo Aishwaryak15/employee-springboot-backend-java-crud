@@ -40,7 +40,7 @@ jobs:
 
     # NEW STEP: Set up Maven
     - name: Set up Maven
-      uses: stCarra/setup-maven@v1.4 # Using a widely used action to install Maven
+      uses: s4u/setup-maven@v1 # Using a widely used action to install Maven
       with:
         maven-version: '3.9.6' # You can choose a specific Maven version
 
