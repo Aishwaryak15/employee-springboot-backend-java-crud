@@ -62,14 +62,15 @@ jobs:
     - name: Build project and package jar
       run: mvn package
 
-    # Authenticate to Google Cloud using OIDC (Workload Identity)
+# Authenticate to Google Cloud using OIDC (Workload Identity)
     - name: Authenticate to Google Cloud using OIDC
       id: auth
       uses: google-github-actions/auth@v2
       with:
         token_format: 'access_token'
-        workload_identity_provider: 'projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/gke-pool/providers/github-actions-provider' # Use env.PROJECT_ID
-        service_account: 'github-actions-gsa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com' # Use env.PROJECT_ID
+        # CORRECTED: Use the Workload Identity Pool and Provider names from the Canvas document setup
+        workload_identity_provider: 'projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+        service_account: 'github-actions-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com'
 
     # Configure Docker to authenticate with Artifact Registry
     - name: Configure Docker to Artifact Registry
