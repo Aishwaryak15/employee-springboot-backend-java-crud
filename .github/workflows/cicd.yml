@@ -1,95 +1,132 @@
-# Define the CI/CD Workflow for Java code
-name: CI-CD Workflow for java code
+# CI/CD Workflow for Spring Boot Employee Management Application
+name: CI/CD Pipeline
 
-# Trigger the workflow on pushes to the specified branch
+# Trigger the workflow on push to main branch and on pull requests
 on:
   push:
     branches:
       - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
 
+# Environment variables
 env:
-  PROJECT_ID: 'sonic-fiber-460609-q4' # update to your Google Cloud project ID
-  REGION: 'us-central1' # update to your region
-  REPOSITORY: 'gke-runner-repo'
-  # SERVICE: 'my-cloudrun-service' # Uncomment if deploying to Cloud Run
+  JAVA_VERSION: '17'
+  MAVEN_OPTS: '-Xmx3072m'
 
-# Add "id-token" with the intended permissions.
+# Permissions for the workflow
 permissions:
-  contents: 'read'
-  id-token: 'write'
+  contents: read
+  checks: write
+  pull-requests: write
 
 jobs:
-  # CI job
+  # Build and Test Job
   build:
-    # IMPORTANT: Use the correct runs-on label for your runner scale set.
-    # Based on your Helm installation, it should be 'github-runner-scale-set'.
-    runs-on: self-hosted
-
-    # Define the steps to be executed in the job
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
     steps:
-    # Checkout the repository to access source code
+    # Checkout the repository
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # Set up JDK 17
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
-        java-version: '17'
+        java-version: ${{ env.JAVA_VERSION }}
+        cache: 'maven'
 
-    - name: Install Maven
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y maven
+    # Make Maven wrapper executable
+    - name: Make Maven wrapper executable
+      run: chmod +x ./mvnw
 
-    # Run unit tests using maven goal
-    - name: Run unit test
-      run: mvn test
+    # Validate Maven project
+    - name: Validate Maven project
+      run: ./mvnw validate
 
-    # Generate code-coverage report using jacoco
-    - name : Get code-coverage report
-      run : mvn jacoco:report
+    # Compile the project
+    - name: Compile project
+      run: ./mvnw clean compile
 
-    # Upload code-coverage report as an artifact
-    - name: Code Coverage Report
+    # Run unit tests
+    - name: Run tests
+      run: ./mvnw test
+
+    # Generate code coverage report using Jacoco
+    - name: Generate code coverage report
+      run: ./mvnw jacoco:report
+
+    # Upload code coverage report as an artifact
+    - name: Upload code coverage report
       uses: actions/upload-artifact@v4
       with:
-        name: Code Coverage Reports
-        path: target/site/jacoco/index.html # Code coverage report will be generate at 'target/site/jacoco/index.html'
+        name: jacoco-coverage-report
+        path: target/site/jacoco/
+        retention-days: 30
 
-    # Build the project and package jar
-    - name: Build project and package jar
-      run: mvn package
+    # Package the application
+    - name: Package application
+      run: ./mvnw package -DskipTests
 
-# Authenticate to Google Cloud using OIDC (Workload Identity)
-    - name: Authenticate to Google Cloud using OIDC
-      id: auth
-      uses: google-github-actions/auth@v2
+    # Upload the built JAR as an artifact
+    - name: Upload JAR artifact
+      uses: actions/upload-artifact@v4
       with:
-        token_format: 'access_token'
-        # CORRECTED: Use the Workload Identity Pool and Provider names from the Canvas document setup
-        workload_identity_provider: 'projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
-        service_account: 'github-actions-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com'
+        name: springboot-backend-jar
+        path: target/*.jar
+        retention-days: 30
 
-    # Configure Docker to authenticate with Artifact Registry
-    - name: Configure Docker to Artifact Registry
-      run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+  # Docker Build Job (optional, can be enabled when needed)
+  docker-build:
+    name: Build Docker Image
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    # Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    # List Workspace Contents (DEBUGGING - remove after verification)
-    - name: List Workspace Contents (DEBUGGING)
-      run: ls -l ${{ github.workspace }}
+    # Download the JAR artifact from build job
+    - name: Download JAR artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: springboot-backend-jar
+        path: target/
 
-    # Build and Push Container to Artifact Registry
-    # This step combines building the Docker image and pushing it.
-    - name: Build and Push Container to Artifact Registry
-      run: |
-        # Define the Docker image name using environment variables and commit SHA
-        DOCKER_IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ github.sha }}"
-        
-        # Build the Docker image from the current directory (where Dockerfile is)
-        docker build -t $DOCKER_IMAGE .
-        
-        # Push the built Docker image to Artifact Registry
-        docker push $DOCKER_IMAGE
+    # Set up Docker Buildx
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    # Build Docker image
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: employee-springboot-backend:${{ github.sha }},employee-springboot-backend:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Optional: Login to Docker Hub (uncomment and configure secrets)
+    # - name: Login to Docker Hub
+    #   uses: docker/login-action@v3
+    #   with:
+    #     username: ${{ secrets.DOCKER_USERNAME }}
+    #     password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # Optional: Push to Docker Hub (uncomment after configuring login)
+    # - name: Push Docker image
+    #   uses: docker/build-push-action@v5
+    #   with:
+    #     context: .
+    #     push: true
+    #     tags: your-dockerhub-username/employee-springboot-backend:${{ github.sha }},your-dockerhub-username/employee-springboot-backend:latest
 
